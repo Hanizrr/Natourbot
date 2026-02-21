@@ -17,7 +17,7 @@ from telegram.ext import (
 TOKEN = os.getenv("8324528568:AAENEljiKuxfPcPVHeB-pq9Nv_WJd3Ic0HU")
 OWNER_ID = int(os.getenv("2118872778", "0"))
 FRIEND_ID = int(os.getenv("7913521214D", "0"))
-ALLOWED_USERS = [2118872778, 7913521214D]
+ALLOWED_USERS = [2118872778, 7913521214]
 
 logging.basicConfig(level=logging.INFO)
 
@@ -223,4 +223,5 @@ app.add_handler(MessageHandler(filters.ALL, check_message))
 
 print("Bot Running...")
 app.run_polling()
+
 
