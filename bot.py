@@ -8,13 +8,14 @@ from telegram import Update, ChatPermissions
 from telegram.ext import (
     ApplicationBuilder,
     MessageHandler,
+    CommandHandler,
     ContextTypes,
     filters,
 )
 
 # ========= ENV =========
-TOKEN = "8324528568:AAENEljiKuxfPcPVHeB-pq9Nv_WJd3Ic0HU"
-OWNER_ID = int(os.getenv("2118872778", "0"))
+TOKEN = os.getenv("8324528568:AAENEljiKuxfPcPVHeB-pq9Nv_WJd3Ic0HU")
+OWNER_ID = int(os.getenv("OWNER_ID", "2118872778"))  # Owner ID درست ست شده
 
 logging.basicConfig(level=logging.INFO)
 
@@ -115,7 +116,7 @@ async def handle_messages(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
     text = update.message.text.lower().strip()
     parts = text.split()
-    cmd = parts[0]
+    cmd = parts[0].lstrip("/")  # حذف / ابتدای دستور
 
     # ===== Locks Check =====
     cursor.execute("""
@@ -161,7 +162,6 @@ async def handle_messages(update: Update, context: ContextTypes.DEFAULT_TYPE):
             return
 
     # ===== OWNER COMMANDS =====
-
     if cmd == "promote" and user_id == OWNER_ID:
         target = await get_target_user(update, context)
         if target:
@@ -201,7 +201,6 @@ async def handle_messages(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
 
     # ========= USER MANAGEMENT =========
-
     if cmd == "ban":
         target = await get_target_user(update, context)
         if target:
@@ -268,25 +267,25 @@ async def handle_messages(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await update.message.reply_text(f"Warn {count}/3")
 
     # ========= MEDIA LOCK COMMANDS =========
-
-    elif text.startswith("lock "):
-        lock_type = text.split()[1]
+    elif cmd in ["lock", "unlock"]:
+        if len(parts) < 2:
+            return
+        lock_type = parts[1]
         valid = ["photo", "video", "voice", "file", "sticker", "text", "link", "chat"]
 
-        if lock_type in valid:
-            cursor.execute("INSERT OR IGNORE INTO locks (chat_id) VALUES (?)", (chat_id,))
+        if lock_type not in valid:
+            return
+
+        cursor.execute("INSERT OR IGNORE INTO locks (chat_id) VALUES (?)", (chat_id,))
+
+        if cmd == "lock":
             if lock_type == "chat":
                 cursor.execute("UPDATE locks SET full=1 WHERE chat_id=?", (chat_id,))
             else:
                 cursor.execute(f"UPDATE locks SET {lock_type}=1 WHERE chat_id=?", (chat_id,))
             conn.commit()
             await update.message.reply_text(f"{lock_type} locked")
-
-    elif text.startswith("unlock "):
-        lock_type = text.split()[1]
-        valid = ["photo", "video", "voice", "file", "sticker", "text", "link", "chat"]
-
-        if lock_type in valid:
+        else:  # unlock
             if lock_type == "chat":
                 cursor.execute("UPDATE locks SET full=0 WHERE chat_id=?", (chat_id,))
             else:
@@ -309,8 +308,14 @@ if not TOKEN:
 
 app = ApplicationBuilder().token(TOKEN).build()
 
+# Handlers
 app.add_handler(MessageHandler(filters.StatusUpdate.NEW_CHAT_MEMBERS, welcome))
 app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_messages))
+
+# اضافه کردن CommandHandler برای دستورها با /
+cmd_list = ["ban","unban","mute","unmute","warn","promote","demote","admins","lock","unlock"]
+for c in cmd_list:
+    app.add_handler(CommandHandler(c, handle_messages))
 
 print("NatorBot Running...")
 app.run_polling()
