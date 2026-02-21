@@ -15,9 +15,9 @@ from telegram.ext import (
 
 # ========= ENV =========
 TOKEN = os.getenv("8324528568:AAENEljiKuxfPcPVHeB-pq9Nv_WJd3Ic0HU")
-OWNER_ID = int(os.getenv("2118872778"))
-FRIEND_ID = int(os.getenv("7913521214"))
-ALLOWED_USERS = [2118872778,7913521214]
+OWNER_ID = int(os.getenv("2118872778", "0"))
+FRIEND_ID = int(os.getenv("7913521214D", "0"))
+ALLOWED_USERS = [2118872778, 7913521214D]
 
 logging.basicConfig(level=logging.INFO)
 
@@ -53,7 +53,7 @@ def is_allowed(user_id):
     return user_id in ALLOWED_USERS
 
 def parse_time(time_str):
-    match = re.match(r"(\d+)([mhd])", time_str)
+    match = re.match(r"(\\d+)([mhd])", time_str)
     if not match:
         return None
     value, unit = match.groups()
@@ -68,7 +68,6 @@ def parse_time(time_str):
 async def log_deleted(context, chat, user, text, reason):
     msg = f"""
 🗑 پیام حذف شد
-
 👤 {user.first_name} ({user.id})
 👥 {chat.title}
 📌 دلیل: {reason}
@@ -85,7 +84,6 @@ async def log_deleted(context, chat, user, text, reason):
 
 # ========= COMMANDS =========
 
-# بن
 async def ban_user(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not is_allowed(update.effective_user.id):
         return
@@ -95,7 +93,6 @@ async def ban_user(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await context.bot.ban_chat_member(update.effective_chat.id, user.id)
     await update.message.reply_text("کاربر بن شد ✅")
 
-# آنبن
 async def unban_user(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not is_allowed(update.effective_user.id):
         return
@@ -105,26 +102,31 @@ async def unban_user(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await context.bot.unban_chat_member(update.effective_chat.id, user_id)
     await update.message.reply_text("کاربر آنبن شد ✅")
 
-# اخطار
 async def warn_user(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not is_allowed(update.effective_user.id):
         return
     if not update.message.reply_to_message:
         return
-    user = update.message.reply_to_message.from_user
 
-    cursor.execute("SELECT count FROM warns WHERE user_id=? AND chat_id=?",
-                   (user.id, update.effective_chat.id))
+    user = update.message.reply_to_message.from_user
+    cursor.execute(
+        "SELECT count FROM warns WHERE user_id=? AND chat_id=?",
+        (user.id, update.effective_chat.id)
+    )
     row = cursor.fetchone()
 
     if row:
         count = row[0] + 1
-        cursor.execute("UPDATE warns SET count=? WHERE user_id=? AND chat_id=?",
-                       (count, user.id, update.effective_chat.id))
+        cursor.execute(
+            "UPDATE warns SET count=? WHERE user_id=? AND chat_id=?",
+            (count, user.id, update.effective_chat.id)
+        )
     else:
         count = 1
-        cursor.execute("INSERT INTO warns VALUES (?, ?, ?)",
-                       (user.id, update.effective_chat.id, count))
+        cursor.execute(
+            "INSERT INTO warns VALUES (?, ?, ?)",
+            (user.id, update.effective_chat.id, count)
+        )
 
     conn.commit()
 
@@ -134,11 +136,10 @@ async def warn_user(update: Update, context: ContextTypes.DEFAULT_TYPE):
             user.id,
             permissions=ChatPermissions(can_send_messages=False)
         )
-        await update.message.reply_text("کاربر به دلیل ۳ اخطار میوت دائمی شد 🚫")
+        await update.message.reply_text("کاربر به دلیل ۳ اخطار میوت شد 🚫")
     else:
-        await update.message.reply_text(f"اخطار ثبت شد ⚠️ ({count}/3)")
+        await update.message.reply_text(f"اخطار ثبت شد ({count}/3)")
 
-# سکوت / میوت
 async def mute_user(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not is_allowed(update.effective_user.id):
         return
@@ -157,81 +158,27 @@ async def mute_user(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 permissions=ChatPermissions(can_send_messages=False),
                 until_date=until
             )
-            return await update.message.reply_text("کاربر میوت زمان‌دار شد ⏳")
+            return await update.message.reply_text("میوت زمان‌دار شد ⏳")
 
     await context.bot.restrict_chat_member(
         update.effective_chat.id,
         user.id,
         permissions=ChatPermissions(can_send_messages=False)
     )
-    await update.message.reply_text("کاربر میوت دائمی شد 🚫")
+    await update.message.reply_text("میوت دائمی شد 🚫")
 
-# قفل جزئی
-async def lock(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if not is_allowed(update.effective_user.id):
-        return
-    if not context.args:
-        return
-    lock_type = context.args[0]
-    cursor.execute("INSERT OR IGNORE INTO locks (chat_id) VALUES (?)",
-                   (update.effective_chat.id,))
-    cursor.execute(f"UPDATE locks SET {lock_type}=1 WHERE chat_id=?",
-                   (update.effective_chat.id,))
-    conn.commit()
-    await update.message.reply_text(f"{lock_type} قفل شد 🔒")
-
-async def unlock(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if not is_allowed(update.effective_user.id):
-        return
-    if not context.args:
-        return
-    lock_type = context.args[0]
-    cursor.execute(f"UPDATE locks SET {lock_type}=0 WHERE chat_id=?",
-                   (update.effective_chat.id,))
-    conn.commit()
-    await update.message.reply_text(f"{lock_type} آزاد شد 🔓")
-
-# قفل کامل گروه با متن
-async def full_lock_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if update.effective_chat.type == "private":
-        return
-    if update.message.text.strip() != "قفل گروه":
-        return
-    if not is_allowed(update.effective_user.id):
-        return
-
-    cursor.execute("INSERT OR IGNORE INTO locks (chat_id) VALUES (?)",
-                   (update.effective_chat.id,))
-    cursor.execute("UPDATE locks SET full=1 WHERE chat_id=?",
-                   (update.effective_chat.id,))
-    conn.commit()
-    await update.message.reply_text("🔒 گروه کاملاً قفل شد")
-
-async def full_unlock_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if update.effective_chat.type == "private":
-        return
-    if update.message.text.strip() != "بازکردن گروه":
-        return
-    if not is_allowed(update.effective_user.id):
-        return
-
-    cursor.execute("UPDATE locks SET full=0 WHERE chat_id=?",
-                   (update.effective_chat.id,))
-    conn.commit()
-    await update.message.reply_text("🔓 قفل کامل گروه برداشته شد")
-
-# خوش‌آمدگویی
 async def welcome(update: Update, context: ContextTypes.DEFAULT_TYPE):
     for member in update.message.new_chat_members:
         await update.message.reply_text(f"خوش اومدی {member.first_name} 🌿")
 
-# بررسی پیام‌ها و حذف اگر قفل فعال
 async def check_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not update.message or update.effective_chat.type == "private":
         return
 
-    cursor.execute("SELECT photo, video, voice, text, link, full FROM locks WHERE chat_id=?",
-                   (update.effective_chat.id,))
+    cursor.execute(
+        "SELECT photo, video, voice, text, link, full FROM locks WHERE chat_id=?",
+        (update.effective_chat.id,)
+    )
     row = cursor.fetchone()
     if not row:
         return
@@ -260,20 +207,20 @@ async def check_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await msg.delete()
 
 # ========= RUN =========
+
+if not TOKEN:
+    raise ValueError("TOKEN تنظیم نشده! در Secrets قرار بده.")
+
 app = ApplicationBuilder().token(TOKEN).build()
 
-# Handlers
-app.add_handler(CommandHandler("سیک", ban_user))
-app.add_handler(CommandHandler("انبن", unban_user))
-app.add_handler(CommandHandler("اخطار", warn_user))
-app.add_handler(CommandHandler("سکوت", mute_user))
-app.add_handler(CommandHandler("قفل", lock))
-app.add_handler(CommandHandler("باز", unlock))
+app.add_handler(CommandHandler("ban", ban_user))
+app.add_handler(CommandHandler("unban", unban_user))
+app.add_handler(CommandHandler("warn", warn_user))
+app.add_handler(CommandHandler("mute", mute_user))
 
 app.add_handler(MessageHandler(filters.StatusUpdate.NEW_CHAT_MEMBERS, welcome))
-app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, full_lock_text))
-app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, full_unlock_text))
 app.add_handler(MessageHandler(filters.ALL, check_message))
 
 print("Bot Running...")
 app.run_polling()
+
