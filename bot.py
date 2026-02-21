@@ -13,7 +13,7 @@ from telegram.ext import (
 )
 
 # ========= ENV =========
-TOKEN = os.getenv("8324528568:AAENEljiKuxfPcPVHeB-pq9Nv_WJd3Ic0HU")
+TOKEN = "8324528568:AAENEljiKuxfPcPVHeB-pq9Nv_WJd3Ic0HU"
 OWNER_ID = int(os.getenv("2118872778", "0"))
 
 logging.basicConfig(level=logging.INFO)
